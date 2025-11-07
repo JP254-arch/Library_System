@@ -10,7 +10,20 @@ class Book extends Model
     use HasFactory;
 
     protected $fillable = [
-        'title','isbn','author_id','category_id','description','total_copies','available_copies','cover_path','published_at'
+        'title',
+        'isbn',
+        'author_id',
+        'category_id',
+        'description',
+        'cover', // <-- MUST be here
+        'total_copies',
+        'available_copies',
+        'published_at',
+    ];
+
+    // Cast cover to array so you can use $book->cover as an array
+    protected $casts = [
+        'cover' => 'array',
     ];
 
     public function author(){ return $this->belongsTo(Author::class); }

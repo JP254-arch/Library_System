@@ -17,10 +17,22 @@ class BookController extends Controller
     public function index(Request $request)
     {
         $q = $request->query('q');
-        $books = Book::with('author', 'category')
-            ->when($q, fn($qb) => $qb->where('title', 'like', "%{$q}%")->orWhere('isbn', 'like', "%{$q}%"))
-            ->paginate(12);
 
+        // Fetch books
+        $booksQuery = Book::with('author', 'category')
+            ->when($q, fn($qb) => $qb
+                ->where('title', 'like', "%{$q}%")
+                ->orWhere('isbn', 'like', "%{$q}%"))
+            ->latest();
+
+        // If root URL, limit to 6 for home page
+        if ($request->path() === '/') {
+            $books = $booksQuery->take(6)->get();
+            return view('home', compact('books'));
+        }
+
+        // Otherwise, paginate for listing page
+        $books = $booksQuery->paginate(12);
         return view('books.index', compact('books', 'q'));
     }
 
@@ -45,12 +57,18 @@ class BookController extends Controller
         ]);
 
         if ($request->hasFile('cover')) {
-            $data['cover_path'] = $request->file('cover')->store('covers', 'public');
+            $path = $request->file('cover')->store('covers', 'public');
+            $data['cover'] = [
+                'type' => 'upload',
+                'path' => $path,
+            ];
         }
+
         $data['available_copies'] = $data['total_copies'];
+
         Book::create($data);
 
-        return redirect()->route('books.index')->with('success', 'Book added');
+        return redirect()->route('books.index')->with('success', 'Book added successfully!');
     }
 
     public function show(Book $book)
@@ -79,22 +97,26 @@ class BookController extends Controller
         ]);
 
         if ($request->hasFile('cover')) {
-            $data['cover_path'] = $request->file('cover')->store('covers', 'public');
+            $path = $request->file('cover')->store('covers', 'public');
+            $data['cover'] = [
+                'type' => 'upload',
+                'path' => $path,
+            ];
         }
 
-        // adjust available copies if total changed
         $diff = $data['total_copies'] - $book->total_copies;
         if ($diff !== 0) {
             $book->available_copies += $diff;
         }
 
         $book->update($data);
-        return redirect()->route('books.index')->with('success', 'Updated');
+
+        return redirect()->route('books.index')->with('success', 'Book updated successfully!');
     }
 
     public function destroy(Book $book)
     {
         $book->delete();
-        return back()->with('success', 'Deleted');
+        return back()->with('success', 'Book deleted successfully!');
     }
 }

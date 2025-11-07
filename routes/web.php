@@ -22,33 +22,58 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 /*
 |--------------------------------------------------------------------------
-| Public Book Routes
+| Home / Landing Page (Public)
 |--------------------------------------------------------------------------
 */
 Route::get('/', [BookController::class, 'index'])->name('home');
-Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
 
 /*
 |--------------------------------------------------------------------------
-| Librarian / Admin Routes
+| Public Static Pages
+|--------------------------------------------------------------------------
+*/
+Route::view('/about', 'pages.about')->name('about');
+Route::view('/contact', 'pages.contact')->name('contact');
+
+/*
+|--------------------------------------------------------------------------
+| Librarian / Admin Routes (Book Management first!)
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:librarian|admin'])->group(function () {
-    Route::resource('books', BookController::class)->except(['show']);
+
+    // Book management: static routes must be defined BEFORE dynamic {book} routes
+    Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
+    Route::post('/books', [BookController::class, 'store'])->name('books.store');
+    Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');
+    Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
+    Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
+
+    // Author & Category management
     Route::resource('authors', AuthorController::class);
     Route::resource('categories', CategoryController::class);
 
-    // Admin Dashboard
+    // Admin dashboard
     Route::get('/admin/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
 
-    // Manage Users
+    // User management
     Route::get('/admin/users', [UserController::class, 'manage'])->name('users.manage');
     Route::patch('/admin/users/{user}/role', [UserController::class, 'updateRole'])->name('users.updateRole');
     Route::delete('/admin/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
 
-    // Loan Management
+    // Loan management
     Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
     Route::patch('/loans/{loan}/return', [LoanController::class, 'markReturned'])->name('loans.return');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated Book Routes (any logged-in user)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/books', [BookController::class, 'index'])->name('books.index');
+    Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
 });
 
 /*
