@@ -15,19 +15,33 @@ class Book extends Model
         'author_id',
         'category_id',
         'description',
-        'cover', // <-- MUST be here
+        'cover', // <-- keep this
         'total_copies',
         'available_copies',
         'published_at',
     ];
 
-    // Cast cover to array so you can use $book->cover as an array
+    // Casts
     protected $casts = [
-        'cover' => 'array',
+        'cover' => 'array',       // cover stored as array
+        'published_at' => 'date', // ensures Carbon instance
     ];
 
-    public function author(){ return $this->belongsTo(Author::class); }
-    public function category(){ return $this->belongsTo(Category::class); }
-    public function loans(){ return $this->hasMany(Loan::class); }
-    public function reservations(){ return $this->hasMany(Reservation::class); }
+    // Relationships
+    public function author()
+    {
+        return $this->belongsTo(Author::class);
+    }
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
+    public function loans()
+    {
+        return $this->hasMany(Loan::class);
+    }
+    public function reservations()
+    {
+        return $this->hasMany(Reservation::class);
+    }
 }

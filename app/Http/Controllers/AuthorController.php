@@ -7,10 +7,54 @@ use Illuminate\Http\Request;
 
 class AuthorController extends Controller
 {
-    public function index(){ $authors = Author::paginate(20); return view('authors.index', compact('authors')); }
-    public function create(){ return view('authors.create'); }
-    public function store(Request $r){ Author::create($r->validate(['name'=>'required'])); return redirect()->route('authors.index'); }
-    public function edit(Author $author){ return view('authors.edit', compact('author')); }
-    public function update(Request $r, Author $author){ $author->update($r->validate(['name'=>'required'])); return redirect()->route('authors.index'); }
-    public function destroy(Author $author){ $author->delete(); return back(); }
+    // Display a list of authors
+    public function index()
+    {
+        $authors = Author::all();
+        return view('authors.index', compact('authors'));
+    }
+
+    // Show form to create a new author
+    public function create()
+    {
+        return view('authors.create');
+    }
+
+    // Store new author
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        Author::create($request->only('name'));
+
+        return redirect()->route('authors.index')->with('success', 'Author created successfully.');
+    }
+
+    // Show form to edit an author
+    public function edit(Author $author)
+    {
+        return view('authors.edit', compact('author'));
+    }
+
+    // Update author
+    public function update(Request $request, Author $author)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $author->update($request->only('name'));
+
+        return redirect()->route('authors.index')->with('success', 'Author updated successfully.');
+    }
+
+    // Delete author
+    public function destroy(Author $author)
+    {
+        $author->delete();
+
+        return redirect()->route('authors.index')->with('success', 'Author deleted successfully.');
+    }
 }

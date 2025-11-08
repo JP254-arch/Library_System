@@ -22,53 +22,54 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 /*
 |--------------------------------------------------------------------------
-| Home / Landing Page (Public)
+| Home / Landing Page
 |--------------------------------------------------------------------------
 */
 Route::get('/', [BookController::class, 'index'])->name('home');
-
-/*
-|--------------------------------------------------------------------------
-| Public Static Pages
-|--------------------------------------------------------------------------
-*/
 Route::view('/about', 'pages.about')->name('about');
 Route::view('/contact', 'pages.contact')->name('contact');
 
 /*
 |--------------------------------------------------------------------------
-| Librarian / Admin Routes (Book Management first!)
+| Admin / Librarian Routes
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:librarian|admin'])->group(function () {
 
-    // Book management: static routes must be defined BEFORE dynamic {book} routes
+    // Dashboard
+    Route::get('/admin/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
+
+    // Book Management
+    Route::get('/admin/books', [BookController::class, 'index'])->name('books.manage');
     Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
     Route::post('/books', [BookController::class, 'store'])->name('books.store');
     Route::get('/books/{book}/edit', [BookController::class, 'edit'])->name('books.edit');
     Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
     Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
 
-    // Author & Category management
+    // Books Data Page
+    Route::get('/admin/books-data', function () {
+        return view('books.books_data');
+    })->name('books.data');
+
+    // Author & Category Management
     Route::resource('authors', AuthorController::class);
     Route::resource('categories', CategoryController::class);
 
-    // Admin dashboard
-    Route::get('/admin/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
-
-    // User management
+    // User Management
     Route::get('/admin/users', [UserController::class, 'manage'])->name('users.manage');
     Route::patch('/admin/users/{user}/role', [UserController::class, 'updateRole'])->name('users.updateRole');
     Route::delete('/admin/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
 
-    // Loan management
+    // Loan Management
     Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
-    Route::patch('/loans/{loan}/return', [LoanController::class, 'markReturned'])->name('loans.return');
+    Route::patch('/admin/loans/{loan}/return', [LoanController::class, 'returnLoan'])->name('admin.loans.return');
+    Route::delete('/loans/{loan}', [LoanController::class, 'destroy'])->name('loans.destroy');
 });
 
 /*
 |--------------------------------------------------------------------------
-| Authenticated Book Routes (any logged-in user)
+| Authenticated Book Routes (All logged-in users)
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function () {
@@ -84,5 +85,6 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'role:member'])->group(function () {
     Route::get('/user/dashboard', [UserController::class, 'index'])->name('user.dashboard');
     Route::post('/books/{book}/borrow', [LoanController::class, 'borrow'])->name('loans.borrow');
+    Route::post('/books/{book}/return', [LoanController::class, 'returnBook'])->name('loans.return');
     Route::get('/my-loans', [LoanController::class, 'myLoans'])->name('loans.my');
 });
