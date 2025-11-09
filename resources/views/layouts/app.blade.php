@@ -112,26 +112,23 @@
     </main>
 
     {{-- Footer --}}
-    <footer class="bg-black text-gray-200 mt-auto">
+    <footer class="bg-black text-gray-200 mt-auto overflow-hidden">
         <div class="container mx-auto px-4 py-10 grid md:grid-cols-3 gap-8">
 
             {{-- Left: Logo and Tagline --}}
-            <div class="text-center md:text-left">
-                <a href="{{ route('home') }}" class="flex items-center justify-center md:justify-start mb-4 group">
+            <div class="text-center md:text-left" data-aos="fade-up" data-aos-duration="1000">
+                <a href="{{ route('home') }}"
+                    class="flex items-center justify-center md:justify-start mb-4 group transition-transform duration-500 hover:scale-105">
                     <img src="{{ asset('images/logo.jpeg') }}" alt="Lexicon Logo"
-                        class="rounded-full w-20 h-20 md:w-24 md:h-24 transition-transform duration-300
-                            shadow-[0_0_20px_rgba(255,112,77,0.8)]
-                            group-hover:scale-110
-                            group-hover:shadow-[0_0_20px_rgba(255,69,0,0.8)]">
+                        class="rounded-full w-20 h-20 md:w-24 md:h-24 shadow-[0_0_20px_rgba(255,112,77,0.8)] group-hover:shadow-[0_0_30px_rgba(255,69,0,0.8)] transition-all duration-500">
                     <span
-                        class="ml-3 text-xl md:text-2xl font-bold transition-colors duration-300
-                    text-[#FF9966] group-hover:text-[#FF4500]">Lexicon</span>
+                        class="ml-3 text-xl md:text-2xl font-bold text-[#FF9966] group-hover:text-[#FF4500] transition-colors duration-500">Lexicon</span>
                 </a>
-                <p class="text-[#FF9966]">YOUR GATEWAY TO ENDLESS LEARNING</p>
+                <p class="text-[#FF9966] opacity-80 animate-pulse-slow">YOUR GATEWAY TO ENDLESS LEARNING</p>
             </div>
 
             {{-- Center: Address & Contact --}}
-            <div class="text-center md:text-left">
+            <div class="text-center md:text-left" data-aos="fade-up" data-aos-duration="1200">
                 <h5 class="text-[#FF704D] font-semibold mb-2">Address</h5>
                 <p>123 Lexicon Library St, Knowledge City</p>
 
@@ -139,11 +136,12 @@
                 <div class="flex flex-col space-y-1">
                     <a href="tel:+31123456789" class="hover:text-[#FF4500] transition">+31 12 345 6789</a>
                     <a href="mailto:info@lexicon.com" class="hover:text-[#FF4500] transition">info@lexicon.com</a>
+                    <a href="mailto:info@lexicon.com" class="hover:text-[#FF4500] transition">helpline@lexicon.com</a>
                 </div>
             </div>
 
             {{-- Right: Quick Links & Social --}}
-            <div class="text-center md:text-left">
+            <div class="text-center md:text-left" data-aos="fade-up" data-aos-duration="1400">
                 <h5 class="text-[#FF704D] font-semibold mb-2">Quick Links</h5>
                 <div class="flex flex-col space-y-1 mb-4">
                     <a href="{{ route('home') }}" class="hover:text-[#FF4500] transition">Home</a>
@@ -153,11 +151,14 @@
                 </div>
 
                 <div class="flex justify-center md:justify-start space-x-4 mt-2 text-xl">
-                    <a href="https://facebook.com" target="_blank" class="hover:text-[#FF4500] transition"><i
+                    <a href="https://facebook.com" target="_blank"
+                        class="hover:text-[#FF4500] transform transition duration-300 hover:scale-110"><i
                             class="fab fa-facebook-f"></i></a>
-                    <a href="https://instagram.com" target="_blank" class="hover:text-[#FF4500] transition"><i
+                    <a href="https://instagram.com" target="_blank"
+                        class="hover:text-[#FF4500] transform transition duration-300 hover:scale-110"><i
                             class="fab fa-instagram"></i></a>
-                    <a href="https://linkedin.com" target="_blank" class="hover:text-[#FF4500] transition"><i
+                    <a href="https://linkedin.com" target="_blank"
+                        class="hover:text-[#FF4500] transform transition duration-300 hover:scale-110"><i
                             class="fab fa-linkedin-in"></i></a>
                 </div>
             </div>
@@ -166,14 +167,48 @@
         <hr class="border-gray-700 my-4">
 
         {{-- Bottom Links --}}
-        <div class="text-center text-gray-400 text-sm pb-4 space-y-2">
+        <div class="text-center text-gray-400 text-sm pb-4 space-y-2" data-aos="fade-up" data-aos-duration="1600">
             <div class="space-x-2">
                 <a href="#privacy" class="hover:text-[#FF4500] transition">Privacy Policy</a> |
                 <a href="#terms" class="hover:text-[#FF4500] transition">Terms of Service</a>
             </div>
             <p>© {{ date('Y') }} Lexicon. All rights reserved.</p>
         </div>
+
+        {{-- Optional AOS animation script --}}
+        <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+        <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                AOS.init({
+                    duration: 1000,
+                    once: false, // Allows animations to repeat when scrolling back
+                    mirror: true // Makes animations visible when scrolling up again
+                });
+            });
+        </script>
+
+        <style>
+            @keyframes pulseSlow {
+
+                0%,
+                100% {
+                    transform: scale(1);
+                    opacity: 0.6;
+                }
+
+                50% {
+                    transform: scale(1.05);
+                    opacity: 0.8;
+                }
+            }
+
+            .animate-pulse-slow {
+                animation: pulseSlow 4s ease-in-out infinite;
+            }
+        </style>
     </footer>
+
 
 </body>
 
