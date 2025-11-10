@@ -28,7 +28,7 @@ It allows users to browse, borrow, and review books seamlessly — while giving 
 |-------|-------------|
 | **Backend** | Laravel (PHP Framework) |
 | **Frontend** | Blade Templates + Tailwind CSS |
-| **Database** | MySQL / MariaDB |
+| **Database** | MySQL |
 | **Authentication** | Laravel Auth |
 | **Forms** | Formspree (for contact form integration) |
 
