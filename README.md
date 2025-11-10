@@ -1,36 +1,48 @@
-# Laravel Library Management System (skeleton)
+# 📚 Lexicon – Digital Library Management System
 
-This ZIP contains a scaffold for a Laravel 10 Library Management System.
+Lexicon is a modern, user-friendly Library Management System built with **Laravel**.  
+It allows users to browse, borrow, and review books seamlessly — while giving admins full control over book data, categories, authors, and user activity.
 
-**Important steps after extracting:**
+---
 
-1. Install composer dependencies:
-   ```
-   composer install
-   ```
+## 🚀 Features
 
-2. Install node dependencies and build:
-   ```
-   npm install
-   npm run dev
-   ```
+### 👥 User Features
+- 📖 **Browse Books** – Explore all available books with titles, covers, and categories.  
+- 💬 **Book Reviews & Ratings** – Share opinions and rate books to guide other readers.  
+- 🔍 **Search & Filter** – Quickly find books by title, author, or category.  
+- ❤️ **User Engagement** – Track views, ratings, and reviews for each book.
 
-3. Copy .env and generate app key:
-   ```
-   cp .env.example .env
-   php artisan key:generate
-   ```
+### 🛠️ Admin Features
+- 📚 **Manage Books** – Add, edit, or delete books with cover images and details.  
+- ✍️ **Manage Authors** – Add or update author profiles.  
+- 🏷️ **Manage Categories** – Organize books into categories for easy discovery.  
+- 👥 **User Management** – Oversee user accounts and activities.  
+- 📊 **Dashboard Insights** – View book statistics like ratings, reviews, and popular titles.
 
-4. Create MySQL database `library_db` (or change .env), then migrate and seed:
-   ```
-   php artisan migrate --seed
-   ```
+---
 
-**Seeded admin credentials**
-- Email: admin@library.com
-- Password: 12345678
+## ⚙️ Tech Stack
 
-Run the app:
+| Layer | Technology |
+|-------|-------------|
+| **Backend** | Laravel (PHP Framework) |
+| **Frontend** | Blade Templates + Tailwind CSS |
+| **Database** | MySQL / MariaDB |
+| **Authentication** | Laravel Auth |
+| **Forms** | Formspree (for contact form integration) |
+
+---
+
+## 🧩 Installation Guide
+
+## 1️⃣ Clone the Repository
+```bash
+git clone https://github.com/JP254-arch/Lexicon.git
+cd lexicon
+
+## Run the app:
+
 ```
 php artisan serve
 ```
