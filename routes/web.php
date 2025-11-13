@@ -23,7 +23,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 /*
 |--------------------------------------------------------------------------
-| Home / Landing Page
+| Home / Static Pages
 |--------------------------------------------------------------------------
 */
 Route::get('/', [BookController::class, 'index'])->name('home');
@@ -64,8 +64,8 @@ Route::middleware(['auth', 'role:librarian|admin'])->group(function () {
 
     // Loan Management
     Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
-    Route::get('/loans/{loan}/edit', [LoanController::class, 'edit'])->name('loans.edit');   // ✅ Added
-    Route::put('/loans/{loan}', [LoanController::class, 'update'])->name('loans.update');  // ✅ Added
+    Route::get('/loans/{loan}/edit', [LoanController::class, 'edit'])->name('loans.edit');
+    Route::put('/loans/{loan}', [LoanController::class, 'update'])->name('loans.update');
     Route::patch('/admin/loans/{loan}/return', [LoanController::class, 'returnLoan'])->name('admin.loans.return');
     Route::delete('/loans/{loan}', [LoanController::class, 'destroy'])->name('loans.destroy');
 });
@@ -86,10 +86,25 @@ Route::middleware('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:member'])->group(function () {
+
+    // Dashboard
     Route::get('/user/dashboard', [UserController::class, 'index'])->name('user.dashboard');
+
+    // Borrow / Return Books
     Route::post('/books/{book}/borrow', [LoanController::class, 'borrow'])->name('loans.borrow');
-    Route::post('/books/{book}/return', [LoanController::class, 'returnBook'])->name('loans.return');
+    Route::post('/books/{loan}/return', [LoanController::class, 'returnBook'])->name('loans.return');
+
+    // Pay deferred loans
+    Route::post('/loans/{loan}/pay-deferred', [LoanController::class, 'payDeferredLoan'])->name('loans.payDeferred');
+
+    // My loans page
     Route::get('/my-loans', [LoanController::class, 'myLoans'])->name('loans.my');
+
+    // Stripe success callback for instant borrow
+    Route::get('/books/{book}/borrow-success', [LoanController::class, 'borrowSuccess'])->name('loans.borrow.success');
+
+    // Stripe success callback for deferred payment
+    Route::get('/loans/{loan}/pay-success', [LoanController::class, 'paySuccess'])->name('loans.pay.success');
 });
 
 /*

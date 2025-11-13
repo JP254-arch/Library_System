@@ -5,156 +5,193 @@ namespace App\Http\Controllers;
 use App\Models\Book;
 use App\Models\Loan;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Stripe\Stripe;
+use Stripe\Checkout\Session as StripeSession;
 
 class LoanController extends Controller
 {
     public function __construct()
     {
         $this->middleware('auth');
-        $this->middleware('role:librarian|admin')->only(['index', 'returnLoan', 'destroy', 'edit', 'update']);
-        $this->middleware('role:member')->only(['borrow', 'returnBook', 'myLoans']);
     }
 
-    // Admin / Librarian - Manage all loans
+    // Display all loans for admin
     public function index()
     {
-        $loans = Loan::with(['book', 'user'])->latest()->paginate(20);
+        $loans = Loan::with(['user', 'book'])->latest()->paginate(10);
         return view('loans.index', compact('loans'));
     }
 
-    // Admin / Librarian - Edit loan form
+    // Borrow book
+    public function borrow(Request $request, Book $book)
+    {
+        $user = Auth::user();
+
+        // Check if already borrowed
+        $existingLoan = $user->loans()->where('book_id', $book->id)
+            ->where('status', 'borrowed')->first();
+
+        if ($existingLoan) {
+            return response()->json(['message' => 'You already borrowed this book.'], 400);
+        }
+
+        $paymentOption = $request->input('payment_option'); // 'instant' or 'deferred'
+        $amount = $book->borrow_price ?? 500; // default borrow price
+
+        if ($paymentOption === 'instant') {
+            // Stripe checkout
+            Stripe::setApiKey(env('STRIPE_SECRET'));
+
+            $session = StripeSession::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [
+                    [
+                        'price_data' => [
+                            'currency' => 'kes',
+                            'product_data' => [
+                                'name' => $book->title,
+                            ],
+                            'unit_amount' => $amount * 100,
+                        ],
+                        'quantity' => 1,
+                    ]
+                ],
+                'mode' => 'payment',
+                'success_url' => route('loans.borrow.success', ['book' => $book->id]),
+                'cancel_url' => route('books.index'),
+            ]);
+
+            return response()->json(['checkoutUrl' => $session->url]);
+        }
+
+        // Deferred payment
+        $loan = Loan::create([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'status' => 'borrowed',
+            'payment_status' => 'unpaid',
+            'amount' => $amount,
+            'due_at' => now()->addDays(14),
+        ]);
+
+        return response()->json(['message' => 'Book borrowed successfully.', 'loan_id' => $loan->id]);
+    }
+
+    // Stripe success callback for instant payment
+    public function borrowSuccess(Book $book)
+    {
+        $user = Auth::user();
+
+        $loan = Loan::create([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'status' => 'borrowed',
+            'payment_status' => 'paid',
+            'amount' => $book->borrow_price ?? 500,
+            'due_at' => now()->addDays(14),
+        ]);
+
+        return redirect()->route('books.index')->with('success', 'Payment successful, book borrowed!');
+    }
+
+    // Return a book
+    public function returnBook(Book $book)
+    {
+        $user = Auth::user();
+
+        $loan = $user->loans()->where('book_id', $book->id)
+            ->where('status', 'borrowed')->firstOrFail();
+
+        if ($loan->payment_status === 'unpaid') {
+            return response()->json(['message' => 'Payment required on return.', 'loan_id' => $loan->id]);
+        }
+
+        $loan->update([
+            'status' => 'returned',
+            'returned_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'Book returned successfully.']);
+    }
+
+    // Pay deferred loan
+    public function payDeferredLoan(Loan $loan)
+    {
+        $user = Auth::user();
+        if ($loan->user_id !== $user->id) {
+            abort(403);
+        }
+
+        Stripe::setApiKey(env('STRIPE_SECRET'));
+
+        $session = StripeSession::create([
+            'payment_method_types' => ['card'],
+            'line_items' => [
+                [
+                    'price_data' => [
+                        'currency' => 'kes',
+                        'product_data' => [
+                            'name' => $loan->book->title,
+                        ],
+                        'unit_amount' => $loan->amount * 100,
+                    ],
+                    'quantity' => 1,
+                ]
+            ],
+            'mode' => 'payment',
+            'success_url' => route('loans.pay.success', $loan->id),
+            'cancel_url' => route('books.index'),
+        ]);
+
+        return redirect($session->url);
+    }
+
+    // Stripe success callback for deferred payment
+    public function paySuccess(Loan $loan)
+    {
+        $loan->update([
+            'payment_status' => 'paid',
+        ]);
+
+        return redirect()->route('books.index')->with('success', 'Payment successful!');
+    }
+
+    // Edit loan (for admin)
     public function edit(Loan $loan)
     {
         return view('loans.edit', compact('loan'));
     }
 
-    // Admin / Librarian - Update loan
+    // Update loan (for admin)
     public function update(Request $request, Loan $loan)
     {
         $request->validate([
             'status' => 'required|in:borrowed,returned',
             'due_at' => 'required|date',
-            'total' => 'required|numeric|min:0',
+            'amount' => 'required|numeric|min:0',
         ]);
 
         $loan->update([
             'status' => $request->status,
             'due_at' => $request->due_at,
-            'total' => $request->total,
+            'amount' => $request->amount,
         ]);
 
-        return redirect()->route('admin.dashboard')->with('success', 'Loan updated successfully.');
+        return redirect()->route('loans.index')->with('success', 'Loan updated successfully!');
     }
 
-    // Member - Borrow a book (with payment option)
-    public function borrow(Request $request, Book $book)
-    {
-        if ($book->available_copies < 1) {
-            return back()->with('error', 'No copies available.');
-        }
-
-        $request->validate([
-            'payment_option' => 'required|in:instant,later',
-        ]);
-
-        $due_at = now()->addWeeks(2);
-
-        DB::transaction(function () use ($book, $due_at, $request) {
-            $isPaid = $request->payment_option === 'instant';
-
-            Loan::create([
-                'book_id' => $book->id,
-                'user_id' => auth()->id(),
-                'borrowed_at' => now(),
-                'due_at' => $due_at,
-                'amount' => 350,
-                'fine' => 0,
-                'total' => 350,
-                'is_paid' => $isPaid,
-                'status' => 'borrowed',
-            ]);
-
-            $book->decrement('available_copies');
-        });
-
-        return back()->with('success', $request->payment_option === 'instant' ?
-            'Book borrowed and paid successfully.' :
-            'Book borrowed successfully. Payment due on return.');
-    }
-
-    // Member - Return book (handles fines and unpaid balances)
-    public function returnBook(Book $book)
-    {
-        $loan = auth()->user()->loans()
-            ->where('book_id', $book->id)
-            ->where('status', 'borrowed')
-            ->first();
-
-        if (!$loan) {
-            return back()->with('error', 'No active loan found for this book.');
-        }
-
-        DB::transaction(function () use ($loan, $book) {
-            $fine = now()->greaterThan($loan->due_at) ? now()->diffInDays($loan->due_at) * 20 : 0;
-            $total = 350 + $fine;
-
-            $loan->update([
-                'returned_at' => now(),
-                'fine' => $fine,
-                'total' => $total,
-                'status' => 'returned',
-            ]);
-
-            $book->increment('available_copies');
-        });
-
-        return back()->with('success', 'Book returned successfully.');
-    }
-
-    // Member - View own loans
-    public function myLoans()
-    {
-        $loans = auth()->user()
-            ->loans()
-            ->with(['book.author', 'book.category'])
-            ->latest()
-            ->get();
-
-        return view('users.dashboard', [
-            'user' => auth()->user(),
-            'loans' => $loans
-        ]);
-    }
-
-    // Admin / Librarian - Mark loan as returned
-    public function returnLoan(Loan $loan)
-    {
-        if ($loan->status === 'returned') {
-            return back()->with('error', 'This loan has already been returned.');
-        }
-
-        DB::transaction(function () use ($loan) {
-            $fine = now()->greaterThan($loan->due_at) ? now()->diffInDays($loan->due_at) * 20 : 0;
-            $total = 350 + $fine;
-
-            $loan->update([
-                'returned_at' => now(),
-                'fine' => $fine,
-                'total' => $total,
-                'status' => 'returned',
-            ]);
-
-            $loan->book->increment('available_copies');
-        });
-
-        return back()->with('success', 'Loan marked as returned.');
-    }
-
-    // Admin / Librarian - Delete a loan
+    // Delete loan (for admin)
     public function destroy(Loan $loan)
     {
         $loan->delete();
-        return back()->with('success', 'Loan deleted successfully.');
+        return redirect()->route('loans.index')->with('success', 'Loan deleted successfully!');
+    }
+
+    // My loans (for member)
+    public function myLoans()
+    {
+        $loans = Auth::user()->loans()->with('book')->latest()->get();
+        return view('loans.my_loans', compact('loans'));
     }
 }

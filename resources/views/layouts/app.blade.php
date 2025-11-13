@@ -5,9 +5,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'Lexicon') }}</title>
+
+    {{-- Tailwind & Alpine --}}
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="//unpkg.com/alpinejs" defer></script>
+
+    {{-- Font Awesome --}}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    {{-- CSRF Token --}}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    {{-- AOS (Animations) --}}
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 </head>
 
 <body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
@@ -74,20 +84,15 @@
                 <a href="{{ route('about') }}" class="text-gray-700 hover:text-indigo-600 font-medium">About</a>
                 <a href="{{ route('contact') }}" class="text-gray-700 hover:text-indigo-600 font-medium">Contact</a>
 
-                {{-- User Icon + Name Dropdown --}}
+                {{-- User Menu --}}
                 <div class="relative flex items-center space-x-2" @mouseenter="userMenu = true"
                     @mouseleave="userMenu = false">
                     @auth
-                        {{-- Username --}}
                         <div class="text-sm text-green-500 font-medium">{{ auth()->user()->name }}</div>
-
-                        {{-- User Icon --}}
                         <button @click="userMenu = !userMenu"
                             class="flex items-center justify-center h-10 w-10 rounded-full bg-gray-200 hover:bg-gray-300 transition shadow-sm">
                             <i class="fa fa-user text-gray-700"></i>
                         </button>
-
-                        {{-- Dropdown --}}
                         <div x-show="userMenu" x-transition
                             class="absolute right-0 mt-3 w-44 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-40">
                             <a href="{{ auth()->user()->role === 'member' ? route('user.dashboard') : route('admin.dashboard') }}"
@@ -103,13 +108,10 @@
                             </form>
                         </div>
                     @else
-                        {{-- User Icon --}}
                         <button @click="userMenu = !userMenu"
                             class="flex items-center justify-center h-10 w-10 rounded-full bg-gray-200 hover:bg-gray-300 transition shadow-sm">
                             <i class="fa fa-user text-gray-700"></i>
                         </button>
-
-                        {{-- Dropdown --}}
                         <div x-show="userMenu" x-transition
                             class="absolute right-0 mt-3 w-44 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-40">
                             <div class="flex flex-col space-y-2 px-3 py-2">
@@ -139,20 +141,19 @@
     {{-- Footer --}}
     <footer class="bg-black text-gray-200 mt-auto overflow-hidden">
         <div class="container mx-auto px-4 py-10 grid md:grid-cols-3 gap-8">
-            {{-- Left: Logo and Tagline --}}
-            <div class="text-center md:text-left" data-aos="fade-up" data-aos-duration="1000">
-                <a href="{{ route('home') }}"
-                    class="flex items-center justify-center md:justify-start mb-4 group transition-transform duration-500 hover:scale-105">
+            {{-- Left: Logo --}}
+            <div class="text-center md:text-left">
+                <a href="{{ route('home') }}" class="flex items-center justify-center md:justify-start mb-4 group">
                     <img src="{{ asset('images/logo.jpeg') }}" alt="Lexicon Logo"
-                        class="rounded-full w-20 h-20 md:w-24 md:h-24 shadow-[0_0_20px_rgba(255,112,77,0.8)] group-hover:shadow-[0_0_30px_rgba(255,69,0,0.8)] transition-all duration-500">
+                        class="rounded-full w-20 h-20 md:w-24 md:h-24 shadow-lg transition-all duration-500">
                     <span
                         class="ml-3 text-xl md:text-2xl font-bold text-[#FF9966] group-hover:text-[#FF4500] transition-colors duration-500">Lexicon</span>
                 </a>
                 <p class="text-[#FF9966] opacity-80 animate-pulse-slow">YOUR GATEWAY TO ENDLESS LEARNING</p>
             </div>
 
-            {{-- Center: Address & Contact --}}
-            <div class="text-center md:text-left" data-aos="fade-up" data-aos-duration="1200">
+            {{-- Center: Contact --}}
+            <div class="text-center md:text-left">
                 <h5 class="text-[#FF704D] font-semibold mb-2">Address</h5>
                 <p>123 Lexicon Library St, Knowledge City</p>
 
@@ -160,12 +161,13 @@
                 <div class="flex flex-col space-y-1">
                     <a href="tel:+31123456789" class="hover:text-[#FF4500] transition">+31 12 345 6789</a>
                     <a href="mailto:info@lexicon.com" class="hover:text-[#FF4500] transition">info@lexicon.com</a>
-                    <a href="mailto:info@lexicon.com" class="hover:text-[#FF4500] transition">helpline@lexicon.com</a>
+                    <a href="mailto:helpline@lexicon.com"
+                        class="hover:text-[#FF4500] transition">helpline@lexicon.com</a>
                 </div>
             </div>
 
-            {{-- Right: Quick Links & Social --}}
-            <div class="text-center md:text-left" data-aos="fade-up" data-aos-duration="1400">
+            {{-- Right: Quick Links --}}
+            <div class="text-center md:text-left">
                 <h5 class="text-[#FF704D] font-semibold mb-2">Quick Links</h5>
                 <div class="flex flex-col space-y-1 mb-4">
                     <a href="{{ route('home') }}" class="hover:text-[#FF4500] transition">Home</a>
@@ -190,7 +192,7 @@
 
         <hr class="border-gray-700 my-4">
 
-        <div class="text-center text-gray-400 text-sm pb-4 space-y-2" data-aos="fade-up" data-aos-duration="1600">
+        <div class="text-center text-gray-400 text-sm pb-4 space-y-2">
             <div class="space-x-2">
                 <a href="#privacy" class="hover:text-[#FF4500] transition">Privacy Policy</a> |
                 <a href="#terms" class="hover:text-[#FF4500] transition">Terms of Service</a>
@@ -198,8 +200,8 @@
             <p>© {{ date('Y') }} Lexicon. All rights reserved.</p>
         </div>
 
+        {{-- AOS JS --}}
         <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-        <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 AOS.init({
@@ -210,6 +212,7 @@
             });
         </script>
 
+        {{-- Pulse Slow Animation --}}
         <style>
             @keyframes pulseSlow {
 
@@ -230,6 +233,10 @@
             }
         </style>
     </footer>
+
+    {{-- Blade Scripts --}}
+    @stack('scripts')
+
 </body>
 
 </html>

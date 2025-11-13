@@ -14,7 +14,7 @@
             <div
                 class="bg-indigo-50 border-l-4 border-indigo-500 rounded-lg p-5 shadow-sm hover:shadow-md transition cursor-pointer">
                 <h2 class="text-sm font-semibold text-indigo-700 uppercase">Books</h2>
-                <p class="text-3xl font-bold text-indigo-800 mt-2">{{ $stats['books'] }}</p>
+                <p class="text-3xl font-bold text-indigo-800 mt-2">{{ $stats['books'] ?? 0 }}</p>
                 <div class="mt-3 space-x-2">
                     <a href="{{ route('books.index') }}"
                         class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">📚
@@ -32,7 +32,7 @@
             <div
                 class="bg-green-50 border-l-4 border-green-500 rounded-lg p-5 shadow-sm hover:shadow-md transition cursor-pointer">
                 <h2 class="text-sm font-semibold text-green-700 uppercase">Users</h2>
-                <p class="text-3xl font-bold text-green-800 mt-2">{{ $stats['users'] }}</p>
+                <p class="text-3xl font-bold text-green-800 mt-2">{{ $stats['users'] ?? 0 }}</p>
                 <a href="{{ route('users.manage') }}"
                     class="mt-3 inline-block bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Manage
                     Users</a>
@@ -42,7 +42,7 @@
             <div
                 class="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-5 shadow-sm hover:shadow-md transition cursor-pointer">
                 <h2 class="text-sm font-semibold text-yellow-700 uppercase">Authors</h2>
-                <p class="text-3xl font-bold text-yellow-800 mt-2">{{ $stats['authors'] }}</p>
+                <p class="text-3xl font-bold text-yellow-800 mt-2">{{ $stats['authors'] ?? 0 }}</p>
                 <a href="{{ route('authors.index') }}"
                     class="mt-3 inline-block bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Manage
                     Authors</a>
@@ -52,7 +52,7 @@
             <div
                 class="bg-purple-50 border-l-4 border-purple-500 rounded-lg p-5 shadow-sm hover:shadow-md transition cursor-pointer">
                 <h2 class="text-sm font-semibold text-purple-700 uppercase">Categories</h2>
-                <p class="text-3xl font-bold text-purple-800 mt-2">{{ $stats['categories'] }}</p>
+                <p class="text-3xl font-bold text-purple-800 mt-2">{{ $stats['categories'] ?? 0 }}</p>
                 <a href="{{ route('categories.index') }}"
                     class="mt-3 inline-block bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Manage
                     Categories</a>
@@ -62,7 +62,7 @@
             <div
                 class="bg-pink-50 border-l-4 border-pink-500 rounded-lg p-5 shadow-sm hover:shadow-md transition cursor-pointer">
                 <h2 class="text-sm font-semibold text-pink-700 uppercase">Active Loans</h2>
-                <p class="text-3xl font-bold text-pink-800 mt-2">{{ $stats['active_loans'] }}</p>
+                <p class="text-3xl font-bold text-pink-800 mt-2">{{ $stats['active_loans'] ?? 0 }}</p>
                 <a href="{{ route('loans.index') }}"
                     class="mt-3 inline-block bg-pink-600 hover:bg-pink-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Manage
                     Loans</a>
@@ -90,12 +90,12 @@
                     <tbody class="bg-white divide-y divide-gray-200">
                         @foreach ($recentLoans as $loan)
                             @php
-                                $fine = $loan->fine;
+                                $fine = $loan->fine ?? 0;
                                 if ($loan->status === 'borrowed' && now()->gt($loan->due_at)) {
                                     $daysOverdue = now()->diffInDays($loan->due_at);
                                     $fine += $daysOverdue * 50;
                                 }
-                                $total = $loan->amount + $fine;
+                                $total = ($loan->amount ?? 0) + $fine;
                             @endphp
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4">{{ $loan->user->name ?? 'N/A' }}</td>
@@ -103,13 +103,15 @@
                                 <td class="px-6 py-4">
                                     @if ($loan->status === 'returned')
                                         <span class="text-green-600 font-semibold">Returned</span>
+                                    @elseif($loan->status === 'pending')
+                                        <span class="text-orange-600 font-semibold">Pending Payment</span>
                                     @elseif(now()->gt($loan->due_at))
                                         <span class="text-red-600 font-semibold">Overdue</span>
                                     @else
                                         <span class="text-yellow-600 font-semibold">Borrowed</span>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4">{{ number_format($loan->amount, 2) }}</td>
+                                <td class="px-6 py-4">{{ number_format($loan->amount ?? 0, 2) }}</td>
                                 <td class="px-6 py-4 text-red-600">{{ $fine > 0 ? number_format($fine, 2) : '-' }}</td>
                                 <td class="px-6 py-4 font-semibold">{{ number_format($total, 2) }}</td>
                                 <td class="px-6 py-4">{{ $loan->due_at?->format('M d, Y') ?? '-' }}</td>
