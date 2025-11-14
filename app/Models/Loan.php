@@ -30,7 +30,8 @@ class Loan extends Model
         'is_paid' => 'boolean',
     ];
 
-    // Relationships
+    const FINE_PER_DAY = 70;
+
     public function book()
     {
         return $this->belongsTo(Book::class);
@@ -41,28 +42,47 @@ class Loan extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Accessors
+    // Check if loan is overdue
     public function getIsOverdueAttribute()
     {
-        return !$this->returned_at && now()->greaterThan($this->due_at);
+        return !$this->returned_at && $this->due_at && now()->greaterThan($this->due_at);
     }
 
+    // Dynamic fine calculation (avoiding recursion)
     public function getFineAttribute($value)
     {
+        // If already returned, use stored fine
         if ($this->status === 'returned') {
-            return $value; // already stored fine
+            return $this->attributes['fine'] ?? 0;
         }
 
+        // Calculate dynamically if overdue
         if ($this->isOverdue) {
-            $daysOverdue = Carbon::parse($this->due_at)->diffInDays(now());
-            return $daysOverdue * 20;
+            $daysOverdue = $this->due_at->diffInDays(now());
+            return $daysOverdue * self::FINE_PER_DAY;
         }
 
         return 0;
     }
 
+    // Total = amount + fine
     public function getTotalAttribute($value)
     {
-        return $this->amount + $this->fine;
+        $baseAmount = $this->amount ?? 500;
+        return $baseAmount + $this->fine;
+    }
+
+    // Status label for dashboards
+    public function getStatusLabelAttribute()
+    {
+        if ($this->status === 'returned')
+            return 'Returned';
+        return $this->isOverdue ? 'Overdue' : 'Borrowed';
+    }
+
+    // Payment label
+    public function getPaymentLabelAttribute()
+    {
+        return $this->is_paid ? 'Paid' : 'Unpaid';
     }
 }

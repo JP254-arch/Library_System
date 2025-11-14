@@ -27,8 +27,7 @@
                             @foreach ($loans as $loan)
                                 <tr class="border-b hover:bg-gray-50 transition">
                                     <td class="py-3 px-4 font-medium text-gray-800">
-                                        {{ $loan->book->title ?? 'Unknown Book' }}
-                                    </td>
+                                        {{ $loan->book->title ?? 'Unknown Book' }}</td>
                                     <td class="py-3 px-4 text-gray-600">{{ $loan->borrowed_at?->format('M d, Y') ?? '-' }}
                                     </td>
                                     <td class="py-3 px-4 text-gray-600">{{ $loan->due_at?->format('M d, Y') ?? '-' }}</td>

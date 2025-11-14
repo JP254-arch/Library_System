@@ -90,38 +90,28 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         @foreach ($recentLoans as $loan)
-                            @php
-                                $fine = $loan->fine ?? 0;
-                                if ($loan->status === 'borrowed' && now()->gt($loan->due_at)) {
-                                    $daysOverdue = now()->diffInDays($loan->due_at);
-                                    $fine += $daysOverdue * 50;
-                                }
-                                $total = ($loan->amount ?? 0) + $fine;
-                            @endphp
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4">{{ $loan->user->name ?? 'N/A' }}</td>
                                 <td class="px-6 py-4">{{ $loan->book->title ?? 'Unknown' }}</td>
                                 <td class="px-6 py-4">
-                                    @if ($loan->status === 'returned')
-                                        <span class="text-green-600 font-semibold">Returned</span>
-                                    @elseif($loan->status === 'pending')
-                                        <span class="text-orange-600 font-semibold">Pending Payment</span>
-                                    @elseif(now()->gt($loan->due_at))
-                                        <span class="text-red-600 font-semibold">Overdue</span>
-                                    @else
-                                        <span class="text-yellow-600 font-semibold">Borrowed</span>
-                                    @endif
+                                    @php
+                                        $statusClass = match ($loan->status_label) {
+                                            'Returned' => 'text-green-600',
+                                            'Overdue' => 'text-red-600',
+                                            default => 'text-yellow-600',
+                                        };
+                                    @endphp
+                                    <span class="{{ $statusClass }} font-semibold">{{ $loan->status_label }}</span>
                                 </td>
                                 <td class="px-6 py-4">
-                                    @if ($loan->payment_status === 'paid')
-                                        <span class="text-green-600 font-semibold">Paid</span>
-                                    @else
-                                        <span class="text-red-500 font-semibold">Unpaid</span>
-                                    @endif
+                                    <span class="{{ $loan->is_paid ? 'text-green-600' : 'text-red-500' }} font-semibold">
+                                        {{ $loan->is_paid ? 'Paid' : 'Unpaid' }}
+                                    </span>
                                 </td>
                                 <td class="px-6 py-4">{{ number_format($loan->amount ?? 0, 2) }}</td>
-                                <td class="px-6 py-4 text-red-600">{{ $fine > 0 ? number_format($fine, 2) : '-' }}</td>
-                                <td class="px-6 py-4 font-semibold">{{ number_format($total, 2) }}</td>
+                                <td class="px-6 py-4 text-red-600">
+                                    {{ $loan->calculated_fine > 0 ? number_format($loan->calculated_fine, 2) : '-' }}</td>
+                                <td class="px-6 py-4 font-semibold">{{ number_format($loan->calculated_total, 2) }}</td>
                                 <td class="px-6 py-4">{{ $loan->due_at?->format('M d, Y') ?? '-' }}</td>
                                 <td class="px-6 py-4">
                                     <a href="{{ route('loans.edit', $loan->id) }}"

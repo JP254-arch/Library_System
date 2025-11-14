@@ -48,7 +48,7 @@ Route::middleware(['auth', 'role:librarian|admin'])->group(function () {
     Route::put('/books/{book}', [BookController::class, 'update'])->name('books.update');
     Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
 
-    // Books Data Page
+    // Books Data Analytics
     Route::get('/admin/books-data', function () {
         return view('books.books_data');
     })->name('books.data');
@@ -63,11 +63,15 @@ Route::middleware(['auth', 'role:librarian|admin'])->group(function () {
     Route::delete('/admin/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
 
     // Loan Management
-    Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
+    // This route is what your dashboard blade calls for "Manage Loans"
+    Route::get('/admin/loans', [LoanController::class, 'index'])->name('loans.index');
     Route::get('/loans/{loan}/edit', [LoanController::class, 'edit'])->name('loans.edit');
     Route::put('/loans/{loan}', [LoanController::class, 'update'])->name('loans.update');
     Route::patch('/admin/loans/{loan}/return', [LoanController::class, 'returnBook'])->name('admin.loans.return');
     Route::delete('/loans/{loan}', [LoanController::class, 'destroy'])->name('loans.destroy');
+
+    // Admin: Stripe return success
+    Route::get('/admin/loans/{loan}/return-success', [LoanController::class, 'returnSuccess'])->name('admin.loans.return.success');
 });
 
 /*
@@ -90,21 +94,26 @@ Route::middleware(['auth', 'role:member'])->group(function () {
     // Dashboard
     Route::get('/user/dashboard', [UserController::class, 'index'])->name('user.dashboard');
 
-    // Borrow / Return Books
+    // Borrow a book
     Route::post('/books/{book}/borrow', [LoanController::class, 'borrow'])->name('loans.borrow');
-    Route::post('/books/{loan}/return', [LoanController::class, 'returnBook'])->name('loans.return');
+
+    // Return a borrowed book (redirect to Stripe if unpaid)
+    Route::post('/loans/{loan}/return', [LoanController::class, 'returnBook'])->name('loans.return');
+
+    // Stripe success callback after return payment
+    Route::get('/loans/{loan}/return-success', [LoanController::class, 'returnSuccess'])->name('loans.return.success');
 
     // Pay deferred loans
     Route::get('/loans/{loan}/pay-deferred', [LoanController::class, 'payDeferredLoan'])->name('loans.payDeferred');
+
+    // Stripe success callback for deferred payment
+    Route::get('/loans/{loan}/pay-success', [LoanController::class, 'paySuccess'])->name('loans.pay.success');
 
     // My loans page
     Route::get('/my-loans', [LoanController::class, 'myLoans'])->name('loans.my');
 
     // Stripe success callback for instant borrow
     Route::get('/books/{book}/borrow-success', [LoanController::class, 'borrowSuccess'])->name('loans.borrow.success');
-
-    // Stripe success callback for deferred payment
-    Route::get('/loans/{loan}/pay-success', [LoanController::class, 'paySuccess'])->name('loans.pay.success');
 });
 
 /*

@@ -21,13 +21,16 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     @forelse($loans as $loan)
                         @php
-                            // Calculate overdue fine (50 Ksh per day)
-                            $fine = $loan->fine;
-                            if ($loan->status === 'borrowed' && now()->gt($loan->due_at)) {
+                            // Initialize fine
+                            $fine = 0;
+
+                            // Calculate overdue fine (70 Ksh per day)
+                            if ($loan->status === 'borrowed' && $loan->due_at && now()->gt($loan->due_at)) {
                                 $daysOverdue = now()->diffInDays($loan->due_at);
-                                $fine += $daysOverdue * 50;
+                                $fine = $daysOverdue * 70; // Updated to 70 to match Recent Loans
                             }
-                            $total = $loan->amount + $fine;
+
+                            $total = ($loan->amount ?? 0) + $fine;
                         @endphp
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -37,7 +40,7 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @if ($loan->status === 'returned')
                                     <span class="text-green-600 font-semibold">Returned</span>
-                                @elseif(now()->gt($loan->due_at))
+                                @elseif($loan->status === 'borrowed' && now()->gt($loan->due_at))
                                     <span class="text-red-600 font-semibold">Overdue</span>
                                 @else
                                     <span class="text-yellow-600 font-semibold">Borrowed</span>

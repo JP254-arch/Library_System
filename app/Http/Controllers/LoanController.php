@@ -21,24 +21,27 @@ class LoanController extends Controller
     }
 
     /**
-     * Admin / Librarian: View all loans
+     * Admin / Librarian: View all loans (Manage Loans)
      */
     public function index()
     {
         $loans = Loan::with(['user', 'book'])->latest()->paginate(10);
+
+        foreach ($loans as $loan) {
+            $loan->fine = $loan->calculated_fine;          // Accessor for fine
+            $loan->total_amount = $loan->calculated_total; // Base amount + fine
+        }
+
         return view('loans.index', compact('loans'));
     }
 
     /**
      * Borrow a book
-     *
-     * Request expects 'payment_option' => 'instant'|'deferred'
      */
     public function borrow(Request $request, Book $book)
     {
         $user = Auth::user();
 
-        // Prevent duplicate active borrow
         $existingLoan = $user->loans()
             ->where('book_id', $book->id)
             ->where('status', 'borrowed')
@@ -51,10 +54,8 @@ class LoanController extends Controller
         $paymentOption = $request->input('payment_option'); // 'instant' or 'deferred'
         $amount = $book->borrow_price ?? self::DEFAULT_AMOUNT;
 
-        // If instant payment, create stripe session and return checkout url (frontend uses it)
         if ($paymentOption === 'instant') {
             Stripe::setApiKey(env('STRIPE_SECRET'));
-
             try {
                 $session = StripeSession::create([
                     'payment_method_types' => ['card'],
@@ -63,7 +64,6 @@ class LoanController extends Controller
                             'price_data' => [
                                 'currency' => 'kes',
                                 'product_data' => ['name' => $book->title],
-                                // Stripe expects amount in cents (or smallest currency unit) — KES has no cents but Stripe expects integer
                                 'unit_amount' => intval($amount * 100),
                             ],
                             'quantity' => 1,
@@ -81,12 +81,12 @@ class LoanController extends Controller
             return response()->json(['checkoutUrl' => $session->url]);
         }
 
-        // Deferred payment: create loan record with unpaid status
+        // Deferred payment
         $loan = Loan::create([
             'user_id' => $user->id,
             'book_id' => $book->id,
             'status' => 'borrowed',
-            'payment_status' => 'unpaid',
+            'is_paid' => false,
             'amount' => $amount,
             'due_at' => now()->addDays(14),
         ]);
@@ -95,84 +95,114 @@ class LoanController extends Controller
     }
 
     /**
-     * Stripe success callback for instant payment (after borrow)
-     *
-     * Marks loan as paid and creates loan if missing.
+     * Stripe success callback for instant borrow
      */
     public function borrowSuccess(Book $book)
     {
         $user = Auth::user();
 
-        // Create a loan if not exists or update existing to paid
         $loan = Loan::firstOrCreate(
             ['user_id' => $user->id, 'book_id' => $book->id, 'status' => 'borrowed'],
             [
                 'amount' => $book->borrow_price ?? self::DEFAULT_AMOUNT,
                 'due_at' => now()->addDays(14),
-                'payment_status' => 'paid',
+                'is_paid' => true,
             ]
         );
 
-        // Ensure payment_status is paid
-        if ($loan->payment_status !== 'paid') {
-            $loan->update(['payment_status' => 'paid']);
+        if (!$loan->is_paid) {
+            $loan->update(['is_paid' => true]);
         }
 
         return redirect()->route('books.index')->with('success', 'Payment successful, book borrowed!');
     }
 
     /**
-     * Return a book (member / admin)
+     * Return a book (redirects to Stripe if unpaid)
      */
     public function returnBook(Loan $loan)
     {
         $user = Auth::user();
 
-        // Authorization: admin can return any, user only their own
         if ($user->role !== 'admin' && $loan->user_id !== $user->id) {
             abort(403);
         }
 
-        // Cannot return if already returned
         if ($loan->status === 'returned') {
-            return response()->json(['message' => 'Book already returned.'], 400);
+            return redirect()->back()->with('info', 'Book already returned.');
         }
 
-        // Require payment before return
-        if ($loan->payment_status === 'unpaid') {
-            return response()->json(['message' => 'Payment required to return the book.', 'loan_id' => $loan->id], 400);
+        // Calculate overdue fine
+        $fine = 0;
+        if ($loan->status === 'borrowed' && $loan->due_at && now()->gt($loan->due_at)) {
+            $daysOverdue = now()->diffInDays($loan->due_at);
+            $fine = $daysOverdue * self::FINE_PER_DAY;
+        }
+        $totalAmount = ($loan->amount ?? 0) + $fine;
+
+        if (!$loan->is_paid) {
+            // Redirect to Stripe for payment
+            Stripe::setApiKey(env('STRIPE_SECRET'));
+            try {
+                $session = StripeSession::create([
+                    'payment_method_types' => ['card'],
+                    'line_items' => [
+                        [
+                            'price_data' => [
+                                'currency' => 'kes',
+                                'product_data' => ['name' => $loan->book->title . ' (Return Payment)'],
+                                'unit_amount' => intval($totalAmount * 100),
+                            ],
+                            'quantity' => 1,
+                        ]
+                    ],
+                    'mode' => 'payment',
+                    'success_url' => route('loans.return.success', ['loan' => $loan->id]),
+                    'cancel_url' => route('loans.my'),
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('Stripe payment redirect failed: ' . $e->getMessage());
+                return redirect()->route('loans.my')->with('error', 'Payment initialization failed.');
+            }
+
+            return redirect($session->url);
         }
 
+        // Already paid, mark as returned
         $loan->update([
             'status' => 'returned',
             'returned_at' => now(),
         ]);
 
-        return response()->json(['message' => 'Book returned successfully.']);
+        return redirect()->route('loans.my')->with('success', 'Book returned successfully.');
     }
 
     /**
-     * Pay deferred loan (initiates Stripe checkout for an existing loan)
+     * Stripe callback after successful return payment
+     */
+    public function returnSuccess(Loan $loan)
+    {
+        $loan->update([
+            'status' => 'returned',
+            'returned_at' => now(),
+            'is_paid' => true,
+        ]);
+
+        return redirect()->route('loans.my')->with('success', 'Payment successful! Book returned.');
+    }
+
+    /**
+     * Pay deferred loan (Stripe checkout)
      */
     public function payDeferredLoan(Loan $loan)
     {
         $user = Auth::user();
-        if ($loan->user_id !== $user->id) {
+        if ($loan->user_id !== $user->id)
             abort(403);
-        }
 
-        // Calculate current fine (if overdue and still borrowed)
-        $fine = 0;
-        if ($loan->status === 'borrowed' && now()->gt($loan->due_at)) {
-            $daysOverdue = now()->diffInDays($loan->due_at);
-            $fine = $daysOverdue * self::FINE_PER_DAY;
-        }
-
-        // Amount to charge = loan amount + current fine
-        $chargeAmount = ($loan->amount ?? self::DEFAULT_AMOUNT) + $fine;
+        $chargeAmount = $loan->calculated_total;
 
         Stripe::setApiKey(env('STRIPE_SECRET'));
-
         try {
             $session = StripeSession::create([
                 'payment_method_types' => ['card'],
@@ -188,31 +218,23 @@ class LoanController extends Controller
                 ],
                 'mode' => 'payment',
                 'success_url' => route('loans.pay.success', ['loan' => $loan->id]),
-                'cancel_url' => route('books.index'),
+                'cancel_url' => route('loans.my'),
             ]);
         } catch (\Throwable $e) {
-            Log::error('Stripe session create failed (deferred): ' . $e->getMessage());
-            return redirect()->route('books.index')->with('error', 'Payment initialization failed.');
+            Log::error('Stripe deferred payment failed: ' . $e->getMessage());
+            return redirect()->route('loans.my')->with('error', 'Payment initialization failed.');
         }
-
-        // Option: store the chargeAmount and fine snapshot if desired (not required)
-        // e.g. $loan->update(['pending_charge' => $chargeAmount, 'pending_fine' => $fine]);
 
         return redirect($session->url);
     }
 
     /**
      * Stripe success callback for deferred payment
-     *
-     * Marks loan as paid and (optionally) clears pending charge snapshot.
      */
     public function paySuccess(Loan $loan)
     {
-        // Only the owner or admin should access this in practice; check guard if needed
-        $loan->update(['payment_status' => 'paid']);
-
-        // Optionally, record the payment (e.g. payment record) and final charged amount (amount + computed fine at payment time)
-        return redirect()->route('books.index')->with('success', 'Payment successful!');
+        $loan->update(['is_paid' => true]);
+        return redirect()->route('loans.my')->with('success', 'Payment successful!');
     }
 
     /**
@@ -237,7 +259,6 @@ class LoanController extends Controller
         $loan->update([
             'status' => $request->status,
             'due_at' => $request->due_at,
-            // Keep amount stored separately; total can be overwritten for admin adjustments
             'total' => $request->total ?? $loan->amount,
         ]);
 
@@ -255,26 +276,34 @@ class LoanController extends Controller
 
     /**
      * Member: My loans dashboard
-     *
-     * Computes fine and total amount (amount + fine) for each loan and returns view.
      */
     public function myLoans()
     {
         $user = Auth::user();
         $loans = $user->loans()->with('book')->latest()->get();
 
-        foreach ($loans as $loan) {
-            $fine = 0;
-            if ($loan->status === 'borrowed' && $loan->due_at && now()->gt($loan->due_at)) {
-                $daysOverdue = now()->diffInDays($loan->due_at);
-                $fine = $daysOverdue * self::FINE_PER_DAY;
-            }
+        return view('users.loans', compact('loans'));
+    }
 
-            $baseAmount = $loan->amount ?? self::DEFAULT_AMOUNT;
-            $loan->fine = $fine;
-            $loan->total_amount = ($loan->total ?? $baseAmount) + $fine;
+    /**
+     * Admin Dashboard
+     */
+    public function adminDashboard()
+    {
+        $stats = [
+            'books' => Book::count(),
+            'users' => \App\Models\User::count(),
+            'authors' => \App\Models\Author::count(),
+            'categories' => \App\Models\Category::count(),
+            'active_loans' => Loan::where('status', 'borrowed')->count(),
+        ];
+
+        $recentLoans = Loan::with(['user', 'book'])->latest()->take(10)->get();
+        foreach ($recentLoans as $loan) {
+            $loan->fine = $loan->calculated_fine;
+            $loan->total_amount = $loan->calculated_total;
         }
 
-        return view('user.loans', compact('loans'));
+        return view('admin.dashboard', compact('stats', 'recentLoans'));
     }
 }
