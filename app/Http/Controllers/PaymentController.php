@@ -8,15 +8,34 @@ use Illuminate\Http\Request;
 use Stripe\Stripe;
 use Stripe\Checkout\Session as StripeSession;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 
 class PaymentController extends Controller
 {
-    // Create Stripe Checkout session
+    /**
+     * Create Stripe Checkout session for a loan
+     */
     public function checkout(Request $request, Loan $loan)
     {
         if ($loan->is_paid) {
             return back()->with('info', 'This loan has already been paid.');
         }
+
+        // Calculate fees for Stripe
+        $borrowFee = 70;
+        $finePerDay = 20;
+
+        $fineDays = $loan->late_days ?? (
+            now()->greaterThan($loan->due_at)
+            ? Carbon::parse($loan->due_at)->diffInDays(now())
+            : 0
+        );
+
+        $fineTotal = $fineDays * $finePerDay;
+        $total = $borrowFee + $fineTotal;
+
+        // Stripe requires USD; convert KES → USD (simple)
+        $usdAmount = max(1, round($total / 155)); // prevent 0 USD errors
 
         Stripe::setApiKey(config('services.stripe.secret'));
 
@@ -25,11 +44,11 @@ class PaymentController extends Controller
             'line_items' => [
                 [
                     'price_data' => [
-                        'currency' => 'kes',
+                        'currency' => 'usd',
                         'product_data' => [
-                            'name' => 'Book Borrowing Fee - ' . $loan->book->title,
+                            'name' => 'Borrow Fee - ' . $loan->book->title,
                         ],
-                        'unit_amount' => ($loan->total ?? 500) * 100, // Stripe uses cents
+                        'unit_amount' => $usdAmount * 100, // cents
                     ],
                     'quantity' => 1,
                 ]
@@ -42,27 +61,35 @@ class PaymentController extends Controller
         return redirect($session->url);
     }
 
-    // Success page
+    /**
+     * Handle successful Stripe payment
+     */
     public function success(Loan $loan)
     {
         // Mark loan as paid
         $loan->update([
             'is_paid' => true,
-            'status' => 'borrowed', // keep active until return
+            'status' => 'borrowed',
         ]);
 
-        // Calculate fine (if any)
-        $fineDays = $loan->late_days ?? 0;
-        $finePerDay = 70;
-        $fineTotal = $fineDays * $finePerDay;
-        $borrowFee = 70; // Default borrow fee
+        // Final fee calculations
+        $borrowFee = 70;
+        $finePerDay = 20;
 
-        // Record payment in payments table
+        $fineDays = $loan->late_days ?? (
+            now()->greaterThan($loan->due_at)
+            ? Carbon::parse($loan->due_at)->diffInDays(now())
+            : 0
+        );
+
+        $fineTotal = $fineDays * $finePerDay;
+
+        // Save payment
         $payment = Payment::create([
             'user_id' => $loan->user_id,
             'loan_id' => $loan->id,
             'method' => 'Stripe',
-            'reference' => 'STRIPE-' . rand(100000, 999999),
+            'reference' => 'STRIPE-' . strtoupper(uniqid()),
             'borrow_fee' => $borrowFee,
             'fine_per_day' => $finePerDay,
             'fine_days' => $fineDays,
@@ -73,12 +100,14 @@ class PaymentController extends Controller
         return view('payments.checkout', [
             'loan' => $loan,
             'status' => 'success',
-            'message' => 'Payment successful! You can now proceed to borrow or return your book.',
-            'payment' => $payment, // pass payment for optional PDF download
+            'message' => 'Payment successful!',
+            'payment' => $payment,
         ]);
     }
 
-    // Cancel page
+    /**
+     * Handle canceled Stripe payment
+     */
     public function cancel(Loan $loan)
     {
         return view('payments.checkout', [
@@ -88,15 +117,48 @@ class PaymentController extends Controller
         ]);
     }
 
-    // Admin PDF receipt download
+    /**
+     * Download PDF receipt for a payment
+     */
     public function downloadReceipt(Payment $payment)
     {
-        // Load related models
         $payment->load('loan.book', 'user');
 
-        // Generate PDF
         $pdf = Pdf::loadView('pdf.receipt', compact('payment'));
 
         return $pdf->download('Receipt_' . $payment->id . '.pdf');
+    }
+
+    /**
+     * Display finance page with filters
+     */
+    public function finance(Request $request)
+    {
+        $query = Payment::with(['user', 'loan.book']);
+
+        if ($request->user_name) {
+            $query->whereHas('user', fn($q) => $q->where('name', 'like', '%' . $request->user_name . '%'));
+        }
+
+        if ($request->book) {
+            $query->whereHas('loan.book', fn($q) => $q->where('title', 'like', '%' . $request->book . '%'));
+        }
+
+        if ($request->filled('method')) {
+            $query->where('method', $request->method);
+        }
+
+        if ($request->from_date) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->to_date) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        $payments = $query->latest()->get();
+        $totalRevenue = $payments->sum('total');
+
+        return view('admin.finance.index', compact('payments', 'totalRevenue'));
     }
 }
